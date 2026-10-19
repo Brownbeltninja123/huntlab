@@ -1,0 +1,32 @@
+# CMake / C++
+/build/
+/out/
+cmake-build-*/
+/.cache/
+/.tools/
+*.user
+*.suo
+*.pdb
+*.obj
+*.lib
+*.dll
+*.exe
+
+# Node
+node_modules/
+apps/web/dist/
+apps/web/.vite/
+
+# Local configuration and databases
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

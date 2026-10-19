@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111827" />
+    <title>HuntLab · Bazaar Analysis</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="HuntLab home"><span class="brand-mark">H</span><span>HuntLab</span></a>
+      <nav aria-label="Main navigation"><a class="active" href="#bazaar">Bazaar</a><a class="disabled" aria-disabled="true">Crafting</a><a href="#fusion" id="fusion-nav">Shard fusion</a><a class="disabled" aria-disabled="true">History</a></nav>
+      <div id="connection" class="connection"><span class="dot"></span><span>Connecting</span></div>
+    </header>
+
+    <main id="bazaar">
+      <section class="intro">
+        <p class="eyebrow">MARKET ANALYSIS</p>
+        <div class="intro-row"><div><h1>Bazaar opportunities</h1><p class="lede">Order-book estimates for manual trades. Prices and fill sizes can change before you act.</p></div><button id="refresh" class="icon-button" type="button" aria-label="Refresh opportunities">↻</button></div>
+      </section>
+
+      <section class="market-strip" aria-label="Market data status">
+        <div><span class="label">Snapshot</span><strong id="snapshot-time">Waiting for data</strong></div>
+        <div><span class="label">Products</span><strong id="product-count">—</strong></div>
+        <div><span class="label">Data age</span><strong id="data-age">—</strong></div>
+        <div id="freshness" class="freshness">Checking source</div>
+      </section>
+
+      <section class="panel profile-panel" aria-labelledby="profile-heading">
+        <div><p class="eyebrow">OPTIONAL PROFILE DATA</p><h2 id="profile-heading">Use your Hypixel balance</h2><p class="helper profile-help">Looks up public profile data on request. Add a server-side API key in the ignored .env file. No Minecraft password or session token is used.</p></div>
+        <form id="profile-form"><label for="profile-username">Minecraft username</label><input id="profile-username" name="username" maxlength="16" autocomplete="username" placeholder="Your in-game name" required /><button class="button" type="submit">Fetch profile</button></form>
+        <div id="profile-result" class="profile-result" role="status" aria-live="polite">Profile not connected</div>
+      </section>
+
+      <section class="panel assumptions">
+        <div><p class="eyebrow">YOUR ASSUMPTIONS</p><h2>Trade limits</h2></div>
+        <form id="settings-form">
+          <label>Sale tax <span class="input-suffix"><input id="tax" inputmode="numeric" type="number" min="0" max="10000" step="1" value="0" required /><span>bp</span></span></label>
+          <label>Capital <span class="input-suffix"><input id="capital" inputmode="decimal" type="number" min="0" step="any" value="1000000" required /><span>coins</span></span></label>
+          <label>Max batch <span class="input-suffix"><input id="quantity" inputmode="numeric" type="number" min="1" max="1000000" step="1" value="100" required /><span>items</span></span></label>
+          <label>Min weekly volume <span class="input-suffix"><input id="weekly-volume" inputmode="numeric" type="number" min="0" step="1" value="10000" required /><span>items</span></span></label>
+          <label>Sale window <span class="input-suffix"><input id="sale-window" inputmode="numeric" type="number" min="1" max="168" step="1" value="24" required /><span>hours</span></span></label>
+          <label>Volume share <span class="input-suffix"><input id="volume-share" inputmode="decimal" type="number" min="0.01" max="100" step="0.01" value="5" required /><span>%</span></span></label>
+          <label>Max data age <span class="input-suffix"><input id="max-data-age" inputmode="numeric" type="number" min="30" max="3600" step="1" value="120" required /><span>sec</span></span></label>
+          <button class="button" type="submit">Apply</button>
+        </form>
+        <p class="helper">Immediate execution only: the C++ analyzer picks the highest-profit batch within your budget, visible order-book depth, and this share of recent weekly trading volume. Older or incomplete market data produces no flip results.</p>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="table-heading"><div><p class="eyebrow">LIVE ORDER BOOK</p><h2>Best estimated returns</h2></div><label class="sort">Sort by<select id="sort"><option value="hourly">Coins per hour</option><option value="batch">Net batch profit</option><option value="roi">ROI</option></select></label><label class="search">Search items<input id="search" type="search" placeholder="e.g. enchanted quartz" autocomplete="off" /></label><span id="row-count" class="row-count">—</span></div>
+        <div id="notice" class="notice" role="status" hidden></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Product</th><th>Batch / volume cap</th><th>Buy VWAP</th><th>Sell VWAP</th><th>Visible depth · buy/sell</th><th>Input cost</th><th>Net / batch</th><th>Estimated coins / hour</th><th>ROI</th><th>Binding limit</th></tr></thead>
+            <tbody id="opportunities"><tr><td colspan="10" class="empty">Waiting for the first validated market snapshot…</td></tr></tbody>
+          </table>
+        </div>
+        <p class="table-footnote">Immediate execution consumes seller offers to acquire and buyer orders to dispose; all average prices are quantity-aware. Visible depth is limited to Hypixel's returned top 30 levels. Coins/hour = net batch profit ÷ selected quantity × the lower past-week volume counter × participation share ÷ 168. It assumes that edge and throughput persist; this is not a fill-time forecast. Limit orders are not simulated.</p>
+      </section>
+
+      <section class="panel table-panel fusion-panel" id="fusion" aria-labelledby="fusion-heading">
+        <div class="table-heading"><div><p class="eyebrow">GUARANTEED OUTPUT ONLY</p><h2 id="fusion-heading">Hunting Attribute Shard fusion</h2></div><button class="button" id="fusion-refresh" type="button">Analyse fusion</button><span id="fusion-count" class="row-count">Not loaded</span></div>
+        <div id="fusion-notice" class="notice" role="status" hidden></div>
+        <div class="table-wrap"><table><thead><tr><th>Inputs</th><th>Output</th><th>Fusions / output count</th><th>Input cost</th><th>Gross proceeds</th><th>Net / batch</th><th>Coins / hour</th><th>ROI</th></tr></thead><tbody id="fusion-opportunities"><tr><td colspan="8" class="empty">Choose “Analyse fusion” to evaluate the pinned recipe catalog against the current Bazaar snapshot.</td></tr></tbody></table></div>
+        <p class="table-footnote">Uses the pinned SkyShards fusion catalog (MIT, revision bc767f82) and current Bazaar seller/buyer depth. Ingredient fusion amounts and guaranteed output quantities come from the catalog; chance-based bonus outputs are excluded. Results are manual estimates and may omit recipe rules that need in-game verification.</p>
+      </section>
+    </main>
+
+    <footer><span>HuntLab · manual decision support</span><span>Unaffiliated with Hypixel</span></footer>
+  </body>
+</html>

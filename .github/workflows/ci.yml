@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang-format
+      - name: Configure C++
+        run: cmake --preset default
+      - name: Build C++ analysis engine and tests
+        run: cmake --build --preset default --parallel
+      - name: Run C++ tests
+        run: ctest --preset default
+      - name: Check formatting and JavaScript syntax
+        run: |
+          git diff --check
+          clang-format --dry-run --Werror core/include/huntlab/domain/market.hpp core/include/huntlab/analysis/bazaar_analysis.hpp core/src/bazaar_analysis.cpp core/src/analysis_cli.cpp tests/unit/bazaar_analysis_test.cpp
+          node --check apps/server/src/main.mjs
+          node --check apps/server/src/server.mjs
+          node --check adapters/hypixel/bazaar.mjs
+          node --check adapters/hypixel/player.mjs
+          node --check adapters/hypixel/items.mjs
+          node --check adapters/persistence/store.mjs
+          node --check adapters/analysis/protocol.mjs
+          node --check apps/web/public/app.js
+      - name: Test ingestion, persistence, API, and C++ vertical slice
+        env:
+          HUNTLAB_ANALYZER: build/default/bin/huntlab_analysis_cli
+        run: >-
+          node --test adapters/hypixel/bazaar.test.mjs
+          adapters/hypixel/player.test.mjs
+          adapters/hypixel/items.test.mjs
+          adapters/analysis/protocol.test.mjs
+          adapters/persistence/store.test.mjs
+          apps/server/server.test.mjs
+          tests/integration/vertical_slice.test.mjs

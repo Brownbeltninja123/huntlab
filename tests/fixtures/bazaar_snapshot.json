@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "lastUpdated": 1792368000000,
+  "products": {
+    "TEST_PRODUCT": {
+      "sell_summary": [
+        { "pricePerUnit": 100, "amount": 4, "orders": 1 }
+      ],
+      "buy_summary": [
+        { "pricePerUnit": 120, "amount": 4, "orders": 1 }
+      ],
+      "quick_status": {
+        "productId": "TEST_PRODUCT",
+        "sellPrice": 100,
+        "buyPrice": 120,
+        "sellVolume": 4,
+        "buyVolume": 4,
+        "sellMovingWeek": 280000,
+        "buyMovingWeek": 280000,
+        "sellOrders": 1,
+        "buyOrders": 1
+      }
+    },
+    "NO_ORDERS": {
+      "sell_summary": [],
+      "buy_summary": []
+    }
+  }
+}

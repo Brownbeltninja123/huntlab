@@ -1,0 +1,306 @@
+openapi: 3.1.0
+info:
+  title: HuntLab API
+  version: 1.0.0
+  description: Manual decision-support API for Hypixel SkyBlock market analysis.
+servers:
+  - url: http://localhost:8080/api/v1
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: API process is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /status:
+    get:
+      operationId: getStatus
+      responses:
+        '200':
+          description: Service and market data freshness state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /profile:
+    get:
+      operationId: getLocalPlayerProfile
+      description: On-demand public profile lookup. Available only from loopback; requires a server-side Hypixel API key and caches results for one hour.
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema: { type: string, minLength: 3, maxLength: 16, pattern: '^[A-Za-z0-9_]+$' }
+      responses:
+        '200':
+          description: Visible values from the selected public SkyBlock profile.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlayerProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { description: Profile lookup is only available from this machine. }
+        '404': { description: Player not found. }
+        '429': { description: Hypixel API rate limit reached. }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '502': { description: Profile data unavailable or hidden. }
+  /items:
+    get:
+      operationId: getBazaarItemMetadata
+      responses:
+        '200':
+          description: Cached names and display metadata for current Bazaar products.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [product_id, name]
+                      properties:
+                        product_id: { type: string }
+                        name: { type: string }
+                        material: { type: [string, 'null'] }
+                        tier: { type: [string, 'null'] }
+        '503': { description: Item names are temporarily unavailable. }
+  /market/snapshot:
+    get:
+      operationId: getMarketSnapshot
+      responses:
+        '200':
+          description: Latest validated snapshot metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /opportunities/bazaar:
+    get:
+      operationId: getBazaarOpportunities
+      parameters:
+        - in: query
+          name: tax_basis_points
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 10000 }
+          description: Explicit sale tax assumption; no default game tax is assumed.
+        - in: query
+          name: capital_coins
+          required: true
+          schema: { type: string, pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$' }
+          description: Maximum acquisition budget in coins.
+        - in: query
+          name: maximum_quantity
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000000, default: 100 }
+        - in: query
+          name: minimum_weekly_volume
+          schema: { type: integer, minimum: 0, maximum: 1000000000000, default: 10000 }
+        - in: query
+          name: sale_horizon_hours
+          schema: { type: integer, minimum: 1, maximum: 168, default: 24 }
+        - in: query
+          name: volume_share_basis_points
+          schema: { type: integer, minimum: 1, maximum: 10000, default: 500 }
+        - in: query
+          name: max_data_age_seconds
+          schema: { type: integer, minimum: 30, maximum: 3600, default: 120 }
+      responses:
+        '200':
+          description: Calculated, auditable estimates for the latest snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /opportunities/fusion:
+    get:
+      operationId: getFusionOpportunities
+      description: Deterministic immediate-book estimates from the hash-pinned recipe catalog. Chance-based bonus output is excluded.
+      parameters:
+        - in: query
+          name: tax_basis_points
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 10000 }
+        - in: query
+          name: capital_coins
+          required: true
+          schema: { type: string, pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$' }
+        - in: query
+          name: maximum_quantity
+          schema: { type: integer, minimum: 1, maximum: 1000000, default: 100 }
+        - in: query
+          name: minimum_weekly_volume
+          schema: { type: integer, minimum: 0, maximum: 1000000000000, default: 10000 }
+        - in: query
+          name: sale_horizon_hours
+          schema: { type: integer, minimum: 1, maximum: 168, default: 24 }
+        - in: query
+          name: volume_share_basis_points
+          schema: { type: integer, minimum: 1, maximum: 10000, default: 500 }
+        - in: query
+          name: max_data_age_seconds
+          schema: { type: integer, minimum: 30, maximum: 3600, default: 120 }
+      responses:
+        '200':
+          description: Fusion estimates and catalog source metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FusionOpportunityList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '500': { $ref: '#/components/responses/ServiceUnavailable' }
+components:
+  responses:
+    BadRequest:
+      description: Invalid request input.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServiceUnavailable:
+      description: No valid snapshot or calculation service is unavailable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok] }
+    Status:
+      type: object
+      required: [market_state, checked_at]
+      properties:
+        market_state: { type: string, enum: [current, stale, unavailable, empty] }
+        snapshot_id: { type: [integer, 'null'], format: int64 }
+        observed_at: { type: [string, 'null'], format: date-time }
+        data_age_ms: { type: [integer, 'null'], minimum: 0 }
+        last_error: { type: [string, 'null'] }
+        checked_at: { type: string, format: date-time }
+    Snapshot:
+      type: object
+      required: [snapshot_id, source, observed_at, product_count, stale]
+      properties:
+        snapshot_id: { type: integer, format: int64 }
+        source: { type: string, const: hypixel_bazaar }
+        observed_at: { type: string, format: date-time }
+        product_count: { type: integer, minimum: 0 }
+        data_age_ms: { type: integer, minimum: 0 }
+        stale: { type: boolean }
+    PlayerProfile:
+      type: object
+      required: [username, uuid, profile_name, purse_coins, bank_coins, fetched_at, balance_visibility]
+      properties:
+        username: { type: string }
+        uuid: { type: string }
+        profile_name: { type: string }
+        purse_coins: { type: [number, 'null'], minimum: 0 }
+        bank_coins: { type: [number, 'null'], minimum: 0 }
+        fetched_at: { type: string, format: date-time }
+        balance_visibility: { type: string, enum: [available, limited] }
+    OpportunityList:
+      type: object
+      required: [snapshot_id, snapshot_timestamp, tax_basis_points, capital_coins, maximum_quantity, minimum_weekly_volume, sale_horizon_hours, volume_share_basis_points, algorithm_version, complete, truncated, opportunities]
+      properties:
+        snapshot_id: { type: integer, format: int64 }
+    FusionOpportunityList:
+      type: object
+      required: [snapshot_id, stale, catalog, assumptions, complete, truncated, opportunities]
+      properties:
+        snapshot_id: { type: integer, format: int64 }
+        stale: { type: boolean }
+        unavailable_reason: { type: [string, 'null'] }
+        catalog:
+          type: object
+          required: [source, revision, sha256, license, recipes_considered]
+          properties:
+            source: { type: string, format: uri }
+            revision: { type: string }
+            sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+            license: { type: string, const: MIT }
+            recipes_considered: { type: integer }
+        assumptions: { type: object }
+        complete: { type: boolean }
+        truncated: { type: boolean }
+        opportunities:
+          type: array
+          items:
+            type: object
+            required: [recipe_id, output_product_id, first_input_product_id, second_input_product_id, operation_count, output_quantity, acquisition_cost_coins, gross_proceeds_coins, sale_fee_coins, net_profit_coins, roi_basis_points, estimated_profit_per_hour_coins]
+            properties:
+              recipe_id: { type: string }
+              output_product_id: { type: string }
+              first_input_product_id: { type: string }
+              second_input_product_id: { type: string }
+              operation_count: { type: integer }
+              output_quantity: { type: integer }
+              acquisition_cost_coins: { type: string }
+              gross_proceeds_coins: { type: string }
+              sale_fee_coins: { type: string }
+              net_profit_coins: { type: string }
+              roi_basis_points: { type: integer }
+              estimated_profit_per_hour_coins: { type: string }
+        snapshot_timestamp: { type: string, format: date-time }
+        data_age_ms: { type: integer, minimum: 0 }
+        stale: { type: boolean }
+        tax_basis_points: { type: integer }
+        capital_coins: { type: string, pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$' }
+        maximum_quantity: { type: integer, minimum: 1 }
+        minimum_weekly_volume: { type: integer, minimum: 0 }
+        sale_horizon_hours: { type: integer, minimum: 1, maximum: 168 }
+        volume_share_basis_points: { type: integer, minimum: 1, maximum: 10000 }
+        algorithm_version: { type: string }
+        complete: { type: boolean }
+        truncated: { type: boolean }
+        opportunities:
+          type: array
+          items: { $ref: '#/components/schemas/Opportunity' }
+    Opportunity:
+      type: object
+      required: [product_id, quantity, acquisition_cost_coins, gross_proceeds_coins, fee_coins, net_profit_coins, estimated_profit_per_hour_coins, roi_basis_points, warnings]
+      properties:
+        product_id: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        acquisition_cost_coins: { type: string, pattern: '^[0-9]+(\.[0-9]{1,6})?$' }
+        gross_proceeds_coins: { type: string, pattern: '^[0-9]+(\.[0-9]{1,6})?$' }
+        fee_coins: { type: string, pattern: '^[0-9]+(\.[0-9]{1,6})?$' }
+        net_profit_coins: { type: string, pattern: '^-?[0-9]+(\.[0-9]{1,6})?$' }
+        estimated_profit_per_hour_coins: { type: string, description: Projected coins per hour from weekly volume participation and the current batch edge. }
+        roi_basis_points: { type: [integer, 'null'] }
+        acquisition_vwap_coins: { type: string, pattern: '^[0-9]+(\.[0-9]{1,6})?$' }
+        disposal_vwap_coins: { type: string, pattern: '^[0-9]+(\.[0-9]{1,6})?$' }
+        buy_price_source: { type: string }
+        sell_price_source: { type: string }
+        warnings: { type: array, items: { type: string } }
+        weekly_volume_cap: { type: integer, minimum: 0 }
+        risk_flags:
+          type: array
+          items:
+            type: string
+            enum: [thin_visible_book, single_order_dominates_book, unusually_wide_spread]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: string }
