@@ -26,7 +26,7 @@ jobs:
       - name: Check formatting and JavaScript syntax
         run: |
           git diff --check
-          clang-format --dry-run --Werror core/include/huntlab/domain/market.hpp core/include/huntlab/analysis/bazaar_analysis.hpp core/src/bazaar_analysis.cpp core/src/analysis_cli.cpp tests/unit/bazaar_analysis_test.cpp
+          clang-format --dry-run --Werror core/include/huntlab/domain/market.hpp core/include/huntlab/analysis/bazaar_analysis.hpp core/include/huntlab/analysis/fusion_analysis.hpp core/src/bazaar_analysis.cpp core/src/fusion_analysis.cpp core/src/fusion_cli.cpp core/src/analysis_cli.cpp tests/unit/bazaar_analysis_test.cpp tests/unit/fusion_analysis_test.cpp
           node --check apps/server/src/main.mjs
           node --check apps/server/src/server.mjs
           node --check adapters/hypixel/bazaar.mjs
@@ -34,7 +34,11 @@ jobs:
           node --check adapters/hypixel/items.mjs
           node --check adapters/persistence/store.mjs
           node --check adapters/analysis/protocol.mjs
+          node --check adapters/fusion/catalog.mjs
+          node --check adapters/fusion/protocol.mjs
           node --check apps/web/public/app.js
+          node --check apps/web/public/fusion-page.js
+          node --check apps/web/public/fusion-graph.js
       - name: Test ingestion, persistence, API, and C++ vertical slice
         env:
           HUNTLAB_ANALYZER: build/default/bin/huntlab_analysis_cli
@@ -44,5 +48,9 @@ jobs:
           adapters/hypixel/items.test.mjs
           adapters/analysis/protocol.test.mjs
           adapters/persistence/store.test.mjs
+          adapters/fusion/catalog.test.mjs
+          adapters/fusion/protocol.test.mjs
           apps/server/server.test.mjs
+          tests/unit/fusion_graph.test.mjs
+          tests/integration/fusion_engine.test.mjs
           tests/integration/vertical_slice.test.mjs

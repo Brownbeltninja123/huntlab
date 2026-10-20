@@ -7,7 +7,7 @@ function encodeLevels(levels) {
 }
 
 export function encodeFusionRequest(snapshot, recipes, settings) {
-  const lines = [`v1f\t${settings.tax_basis_points}\t${settings.capital_micros}\t${settings.maximum_quantity}\t${settings.minimum_weekly_volume}\t${settings.sale_horizon_hours}\t${settings.volume_share_basis_points}`];
+  const lines = [`v2f\t${settings.tax_basis_points}\t${settings.capital_micros}\t${settings.maximum_quantity}\t${settings.minimum_weekly_volume}\t${settings.sale_horizon_hours}\t${settings.volume_share_basis_points}`];
   for (const p of snapshot.products) {
     lines.push(['P', p.product_id, p.conservative_weekly_volume ?? -1,
       encodeLevels(p.sell_offers), encodeLevels(p.buy_orders)].join('\t'));
@@ -26,20 +26,21 @@ export function parseFusionOutput(output) {
   if (!output.trim()) return [];
   return output.trimEnd().split(/\r?\n/).map((line) => {
     const f = line.split('\t');
-    if (f.length !== 13 || f[0] !== 'F' || !/^[A-Z0-9_:-]{1,128}$/.test(f[1])) {
+    if (f.length !== 15 || f[0] !== 'F' || !/^[A-Z0-9_:-]{1,128}$/.test(f[1])) {
       throw new Error('fusion engine returned malformed output');
     }
-    const smallInts = [f[5], f[6], f[11]].map(Number);
+    const smallInts = [f[5], f[6], f[13]].map(Number);
     if (smallInts.some((value) => !Number.isSafeInteger(value)) ||
-        !f.slice(7, 11).every((value) => /^-?[0-9]+$/.test(value)) || !/^-?[0-9]+$/.test(f[12])) {
+        !f.slice(7, 13).every((value) => /^-?[0-9]+$/.test(value)) || !/^-?[0-9]+$/.test(f[14])) {
       throw new Error('fusion engine returned invalid numbers');
     }
     return {
       recipe_id: f[1], output_product_id: f[2], first_input_product_id: f[3], second_input_product_id: f[4],
       operation_count: smallInts[0], output_quantity: smallInts[1], acquisition_cost_micros: BigInt(f[7]),
-      gross_proceeds_micros: BigInt(f[8]), sale_fee_micros: BigInt(f[9]),
-      net_profit_micros: BigInt(f[10]), roi_basis_points: smallInts[2],
-      estimated_profit_per_hour_micros: BigInt(f[12]),
+      first_input_cost_micros: BigInt(f[8]), second_input_cost_micros: BigInt(f[9]),
+      gross_proceeds_micros: BigInt(f[10]), sale_fee_micros: BigInt(f[11]),
+      net_profit_micros: BigInt(f[12]), roi_basis_points: smallInts[2],
+      estimated_profit_per_hour_micros: BigInt(f[14]),
     };
   });
 }

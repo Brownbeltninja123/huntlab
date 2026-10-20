@@ -8,6 +8,8 @@
 namespace huntlab::analysis {
 namespace {
 
+constexpr std::int32_t maximum_displayed_roi_basis_points = 50'000; // 500%
+
 struct Fill {
     std::int64_t total_microcoins{};
     domain::Quantity quantity{};
@@ -204,8 +206,13 @@ std::vector<Opportunity> analyze_bazaar(const domain::MarketSnapshot& snapshot,
 
             const auto roi_value = static_cast<long double>(net) * 10'000.0L /
                                    static_cast<long double>(acquisition->total_microcoins);
-            const auto bounded_roi = std::min(
-                roi_value, static_cast<long double>(std::numeric_limits<std::int32_t>::max()));
+            // Very large ROI on a single instantaneous snapshot is usually an
+            // anomalous or crossed order book, not a repeatable flip. Exclude it
+            // instead of presenting it as an executable opportunity. This also
+            // keeps the int32 ROI saturation sentinel out of the API entirely.
+            if (roi_value >= maximum_displayed_roi_basis_points) {
+                continue;
+            }
             Opportunity candidate;
             candidate.product_id = product.product_id;
             candidate.quantity = candidate_quantity;
@@ -214,7 +221,7 @@ std::vector<Opportunity> analyze_bazaar(const domain::MarketSnapshot& snapshot,
             candidate.gross_profit = {disposal->total_microcoins - acquisition->total_microcoins};
             candidate.sale_fee = {*fee};
             candidate.net_profit_microcoins = net;
-            candidate.roi_basis_points = static_cast<std::int32_t>(bounded_roi);
+            candidate.roi_basis_points = static_cast<std::int32_t>(roi_value);
             candidate.acquisition_vwap = {
                 acquisition->total_microcoins / candidate_quantity +
                 (acquisition->total_microcoins % candidate_quantity != 0 ? 1 : 0)};

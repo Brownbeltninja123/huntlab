@@ -18,12 +18,30 @@ export function parseFusionCatalog(source) {
     throw new Error('Fusion catalog must contain shard and recipe objects');
   }
   const ids = new Set();
+  const productIds = new Set();
+  const shards = [];
   for (const [key, shard] of Object.entries(data.shards)) {
     if (!ID.test(key) || !shard || !ID.test(shard.internal_id ?? '') ||
-        !Number.isSafeInteger(shard.fuse_amount) || shard.fuse_amount <= 0) {
+        typeof shard.name !== 'string' || !shard.name.trim() ||
+        !Number.isSafeInteger(shard.fuse_amount) || shard.fuse_amount <= 0 || productIds.has(shard.internal_id) ||
+        !['family', 'type', 'rarity', 'recipe_type'].every((field) => shard[field] == null || typeof shard[field] === 'string') ||
+        !['synthesized', 'chameleon'].every((field) => shard[field] == null || typeof shard[field] === 'boolean')) {
       throw new Error(`Invalid fusion shard entry ${key}`);
     }
     ids.add(key);
+    productIds.add(shard.internal_id);
+    shards.push({
+      shard_id: shard.internal_id,
+      source_key: key,
+      name: shard.name,
+      family: shard.family ?? null,
+      type: shard.type ?? null,
+      rarity: shard.rarity ?? null,
+      fuse_amount: shard.fuse_amount,
+      synthesized: shard.synthesized ?? null,
+      chameleon: shard.chameleon ?? null,
+      recipe_type: shard.recipe_type ?? null,
+    });
   }
   const recipes = [];
   for (const [outputKey, yields] of Object.entries(data.recipes)) {
@@ -50,14 +68,11 @@ export function parseFusionCatalog(source) {
           first_input_quantity: first.fuse_amount,
           second_input_product_id: second.internal_id,
           second_input_quantity: second.fuse_amount,
-          first_shard_key: firstKey,
-          second_shard_key: secondKey,
-          output_shard_key: outputKey,
         });
       }
     }
   }
-  return { recipes, shardCount: ids.size, rawRecipeCount: recipes.length };
+  return { shards, recipes, shardCount: ids.size, rawRecipeCount: recipes.length };
 }
 
 export async function loadFusionCatalog() {

@@ -27,6 +27,8 @@ struct FusionOpportunity {
     domain::Quantity operation_count{};
     domain::Quantity output_quantity{};
     domain::Coins acquisition_cost;
+    domain::Coins first_input_cost;
+    domain::Coins second_input_cost;
     domain::Coins gross_proceeds;
     domain::Coins sale_fee;
     std::int64_t net_profit_microcoins{};

@@ -11,7 +11,7 @@
   <body>
     <header class="topbar">
       <a class="brand" href="/" aria-label="HuntLab home"><span class="brand-mark">H</span><span>HuntLab</span></a>
-      <nav aria-label="Main navigation"><a class="active" href="#bazaar">Bazaar</a><a class="disabled" aria-disabled="true">Crafting</a><a href="#fusion" id="fusion-nav">Shard fusion</a><a class="disabled" aria-disabled="true">History</a></nav>
+      <nav aria-label="Main navigation"><a href="/" data-route="bazaar">Bazaar</a><a class="disabled" aria-disabled="true">Crafting</a><a href="/fusion" data-route="fusion">Shard fusions</a><a class="disabled" aria-disabled="true">History</a></nav>
       <div id="connection" class="connection"><span class="dot"></span><span>Connecting</span></div>
     </header>
 
@@ -34,7 +34,8 @@
         <div id="profile-result" class="profile-result" role="status" aria-live="polite">Profile not connected</div>
       </section>
 
-      <section class="panel assumptions">
+      <div id="bazaar-settings-slot"></div>
+      <section class="panel assumptions" id="shared-assumptions">
         <div><p class="eyebrow">YOUR ASSUMPTIONS</p><h2>Trade limits</h2></div>
         <form id="settings-form">
           <label>Sale tax <span class="input-suffix"><input id="tax" inputmode="numeric" type="number" min="0" max="10000" step="1" value="0" required /><span>bp</span></span></label>
@@ -61,12 +62,65 @@
         <p class="table-footnote">Immediate execution consumes seller offers to acquire and buyer orders to dispose; all average prices are quantity-aware. Visible depth is limited to Hypixel's returned top 30 levels. Coins/hour = net batch profit ÷ selected quantity × the lower past-week volume counter × participation share ÷ 168. It assumes that edge and throughput persist; this is not a fill-time forecast. Limit orders are not simulated.</p>
       </section>
 
-      <section class="panel table-panel fusion-panel" id="fusion" aria-labelledby="fusion-heading">
-        <div class="table-heading"><div><p class="eyebrow">GUARANTEED OUTPUT ONLY</p><h2 id="fusion-heading">Hunting Attribute Shard fusion</h2></div><button class="button" id="fusion-refresh" type="button">Analyse fusion</button><span id="fusion-count" class="row-count">Not loaded</span></div>
-        <div id="fusion-notice" class="notice" role="status" hidden></div>
-        <div class="table-wrap"><table><thead><tr><th>Inputs</th><th>Output</th><th>Fusions / output count</th><th>Input cost</th><th>Gross proceeds</th><th>Net / batch</th><th>Coins / hour</th><th>ROI</th></tr></thead><tbody id="fusion-opportunities"><tr><td colspan="8" class="empty">Choose “Analyse fusion” to evaluate the pinned recipe catalog against the current Bazaar snapshot.</td></tr></tbody></table></div>
-        <p class="table-footnote">Uses the pinned SkyShards fusion catalog (MIT, revision bc767f82) and current Bazaar seller/buyer depth. Ingredient fusion amounts and guaranteed output quantities come from the catalog; chance-based bonus outputs are excluded. Results are manual estimates and may omit recipe rules that need in-game verification.</p>
+    </main>
+
+    <main id="fusion-page" hidden>
+      <section class="fusion-intro">
+        <a class="back-link" href="/" data-route="bazaar">← Bazaar opportunities</a>
+        <p class="eyebrow">HUNTING ATTRIBUTE SHARDS</p>
+        <div class="fusion-title-row"><div><h1>Fusion explorer</h1><p class="lede">Explore source catalogue recipes, inspect ingredient routes and compare current Bazaar opportunities.</p></div><button id="fusion-refresh" class="button" type="button">Refresh analysis</button></div>
       </section>
+
+      <section class="market-strip fusion-status" aria-label="Fusion analysis status">
+        <div><span class="label">Market snapshot</span><strong id="fusion-snapshot">Waiting for data</strong></div>
+        <div><span class="label">Catalogue</span><strong id="fusion-catalog-status">Loading catalogue…</strong></div>
+        <div><span class="label">Eligible flips</span><strong id="fusion-count">—</strong></div>
+        <div id="fusion-freshness" class="freshness">Checking source</div>
+      </section>
+
+      <div id="fusion-settings-slot"></div>
+
+      <div id="fusion-notice" class="notice fusion-notice" role="status" aria-live="polite" hidden></div>
+
+      <section class="fusion-layout" aria-label="Fusion discovery workspace">
+        <aside class="panel fusion-sidebar" aria-label="Shard and opportunity discovery">
+          <div class="fusion-side-section">
+            <div class="section-heading"><div><p class="eyebrow">DISCOVER</p><h2>Find a shard</h2></div><span id="shard-count" class="row-count">—</span></div>
+            <label class="field-label" for="shard-search">Search name, family, or ID</label>
+            <input id="shard-search" class="wide-input" type="search" placeholder="e.g. Grove or SHARD_GROVE" autocomplete="off" />
+            <div class="filter-grid">
+              <label class="field-label">Attribute family<select id="family-filter"><option value="">All families</option></select></label>
+              <label class="field-label">Rarity<select id="rarity-filter"><option value="">All rarities</option></select></label>
+              <label class="field-label">Recipe type<select id="recipe-filter"><option value="">All recipe types</option><option value="standard">Standard</option></select></label>
+            </div>
+            <div id="shard-results" class="shard-results" aria-label="Shard outputs"></div>
+          </div>
+          <div class="fusion-side-section opportunities-section">
+            <div class="section-heading"><div><p class="eyebrow">BAZAAR-RANKED</p><h2>Eligible opportunities</h2></div><span id="opportunity-count" class="row-count">—</span></div>
+            <label class="field-label" for="fusion-sort">Rank by</label>
+            <select id="fusion-sort" class="wide-select"><option value="net">Net batch profit</option><option value="roi">ROI</option><option value="hourly">Estimated coins / hour</option></select>
+            <div class="discovery-thresholds"><label class="field-label" for="fusion-min-profit">Minimum net batch profit<input id="fusion-min-profit" class="wide-input" type="number" min="0" step="any" value="0" /></label><label class="field-label" for="fusion-min-roi">Minimum ROI (%)<input id="fusion-min-roi" class="wide-input" type="number" min="0" step="any" value="0" /></label></div>
+            <p class="helper">Only positive results returned by the C++ order-book analyser appear here. Profit/hour is a throughput estimate, not a fill-time forecast.</p>
+            <div id="fusion-opportunities" class="opportunity-list" aria-live="polite"><p class="empty-copy">Loading current analysis…</p></div>
+          </div>
+        </aside>
+
+        <section class="fusion-workspace" aria-label="Selected shard fusion graph and details">
+          <section class="panel graph-panel" aria-labelledby="graph-heading">
+            <div class="graph-toolbar"><div><p class="eyebrow">RECIPE EXPLORER</p><h2 id="graph-heading">Select a shard or opportunity</h2></div><div class="graph-controls" aria-label="Graph controls"><button id="graph-zoom-out" class="control-button" type="button" aria-label="Zoom out">−</button><button id="graph-zoom-in" class="control-button" type="button" aria-label="Zoom in">+</button><button id="graph-fit" class="control-button" type="button">Fit graph</button><button id="graph-expand" class="control-button" type="button" aria-expanded="false">Expand alternatives</button><button id="graph-reset" class="control-button" type="button">Return to all shards</button></div></div>
+            <nav id="fusion-breadcrumb" class="fusion-breadcrumb" aria-label="Selected shard path"></nav>
+            <div id="graph-error" class="graph-message" role="status" hidden></div>
+            <div id="fusion-graph" class="fusion-graph" tabindex="0" aria-label="Interactive fusion graph. Use Tab to focus nodes and Enter to inspect a shard or recipe."><svg id="fusion-svg" role="group" aria-labelledby="graph-heading" aria-describedby="graph-description"><desc id="graph-description">Fusion ingredients flow from left to right through a transformation node to a guaranteed output.</desc><defs><marker id="fusion-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="graph-arrow" /></marker></defs><g id="graph-content"></g></svg></div>
+            <p id="graph-caption" class="graph-caption">Choose a shard to view its directly documented fusion recipes. Select an ingredient to explore its source recipes.</p>
+          </section>
+
+          <section class="panel recipe-panel" aria-labelledby="recipe-heading">
+            <div class="table-heading recipe-heading"><div><p class="eyebrow">SELECTED OUTPUT</p><h2 id="recipe-heading">Shard details</h2></div><span id="validation-badge" class="status-badge">No selection</span></div>
+            <div id="recipe-detail" class="recipe-detail"><p class="empty-copy">Select a shard from search or open a ranked opportunity to inspect its recipe and market analysis.</p></div>
+          </section>
+        </section>
+      </section>
+      <p class="fusion-provenance">Fusion relationships are from the pinned SkyShards catalogue, with structural checks only. Game requirements and special mechanics have not been independently verified. Bonus outcomes are excluded; all execution is manual. <a href="https://github.com/Campionnn/SkyShards/tree/bc767f820318ab0ae2ce6bd5150c7095dd00da12" target="_blank" rel="noreferrer">Source revision bc767f82 · MIT</a></p>
     </main>
 
     <footer><span>HuntLab · manual decision support</span><span>Unaffiliated with Hypixel</span></footer>

@@ -65,6 +65,33 @@ test('REST API exposes health, freshness, validation errors and C++ result contr
     const itemResponse = await fetch(`${origin}/api/v1/items`);
     assert.deepEqual((await itemResponse.json()).items.map((item) => item.name), ['Test Product']);
 
+    const catalogResponse = await fetch(`${origin}/api/v1/fusion/catalog`);
+    assert.equal(catalogResponse.status, 200);
+    const catalog = await catalogResponse.json();
+    assert.equal(catalog.shard_count, 322);
+    assert.equal(catalog.validation_status, 'structural_catalog_validation_only');
+    assert.ok(catalog.shards.some((shard) => shard.shard_id === 'SHARD_GROVE' && shard.name === 'Grove'));
+    const groveRecipe = catalog.shards.find((shard) => shard.shard_id === 'SHARD_GROVE');
+    const shardResponse = await fetch(`${origin}/api/v1/fusion/catalog/shards/${groveRecipe.shard_id}?limit=1`);
+    assert.equal(shardResponse.status, 200);
+    const grove = await shardResponse.json();
+    assert.equal(grove.shard.shard_id, 'SHARD_GROVE');
+    assert.equal(grove.limit, 1);
+    assert.equal(grove.total_recipes > grove.recipes.length, true);
+    assert.equal(grove.recipes[0].output_product_id, 'SHARD_GROVE');
+    const selectedRecipe = await loadFusionCatalog().then((loaded) => loaded.recipes.find((recipe) => recipe.output_product_id === 'SHARD_GROVE'));
+    const selectedRecipeResponse = await fetch(`${origin}/api/v1/fusion/catalog/shards/SHARD_GROVE?recipe_id=${encodeURIComponent(selectedRecipe.recipe_id)}`);
+    assert.equal(selectedRecipeResponse.status, 200);
+    assert.ok((await selectedRecipeResponse.json()).recipes.some((recipe) => recipe.recipe_id === selectedRecipe.recipe_id));
+    assert.equal((await fetch(`${origin}/api/v1/fusion/catalog/shards/SHARD_GROVE?limit=1000`)).status, 400);
+    assert.equal((await fetch(`${origin}/api/v1/fusion/catalog/shards/UNKNOWN`)).status, 404);
+    const directFusionPage = await fetch(`${origin}/fusion`);
+    assert.equal(directFusionPage.status, 200);
+    assert.match(await directFusionPage.text(), /Fusion explorer/);
+    assert.equal((await fetch(`${origin}/fusion-page.js`)).status, 200);
+    assert.equal((await fetch(`${origin}/fusion-graph.js`)).status, 200);
+    assert.equal((await fetch(`${origin}/styles.css`)).status, 200);
+
     const status = await fetch(`${origin}/api/v1/status`);
     assert.equal((await status.json()).market_state, 'current');
 
@@ -135,6 +162,7 @@ test('fusion endpoint exposes pinned recipe requirements and market depth with t
       return [{ recipe_id: recipe.recipe_id, output_product_id: recipe.output_product_id,
         first_input_product_id: recipe.first_input_product_id, second_input_product_id: recipe.second_input_product_id,
         operation_count: 2, output_quantity: 4, acquisition_cost_micros: 1_400n,
+        first_input_cost_micros: 1_000n, second_input_cost_micros: 400n,
         gross_proceeds_micros: 600n, sale_fee_micros: 0n, net_profit_micros: 0n,
         roi_basis_points: 0, estimated_profit_per_hour_micros: 0n }];
     },
@@ -150,6 +178,7 @@ test('fusion endpoint exposes pinned recipe requirements and market depth with t
     assert.ok(result.catalog.recipes_considered >= 1);
     assert.equal(result.opportunities[0].inputs[0].quantity_total, recipe.first_input_quantity * 2);
     assert.equal(result.opportunities[0].inputs[1].quantity_per_fusion, recipe.second_input_quantity);
+    assert.equal(result.opportunities[0].inputs[0].acquisition_cost_coins, '0.001');
     assert.equal(result.opportunities[0].visible_output_depth, '60');
   } finally {
     await app.close();

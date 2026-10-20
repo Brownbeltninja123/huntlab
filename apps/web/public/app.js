@@ -1,3 +1,5 @@
+import { initFusionPage, refreshFusionPage } from './fusion-page.js';
+
 const connection = document.querySelector('#connection');
 const snapshotTime = document.querySelector('#snapshot-time');
 const productCount = document.querySelector('#product-count');
@@ -13,10 +15,6 @@ const profileUsername = document.querySelector('#profile-username');
 const profileResult = document.querySelector('#profile-result');
 const searchInput = document.querySelector('#search');
 const sortInput = document.querySelector('#sort');
-const fusionRows = document.querySelector('#fusion-opportunities');
-const fusionNotice = document.querySelector('#fusion-notice');
-const fusionCount = document.querySelector('#fusion-count');
-const fusionRefresh = document.querySelector('#fusion-refresh');
 const settingsIds = ['tax', 'capital', 'quantity', 'weekly-volume', 'sale-window', 'volume-share', 'max-data-age'];
 let opportunities = [];
 let itemNames = new Map();
@@ -227,68 +225,11 @@ async function load() {
   }
 }
 
-async function loadFusion() {
-  fusionRefresh.disabled = true;
-  fusionCount.textContent = 'Analysing…';
-  fusionNotice.hidden = true;
-  try {
-    const parameters = new URLSearchParams({
-      tax_basis_points: document.querySelector('#tax').value,
-      capital_coins: document.querySelector('#capital').value,
-      maximum_quantity: document.querySelector('#quantity').value,
-      minimum_weekly_volume: document.querySelector('#weekly-volume').value,
-      sale_horizon_hours: document.querySelector('#sale-window').value,
-      volume_share_basis_points: String(Number(document.querySelector('#volume-share').value) * 100),
-      max_data_age_seconds: document.querySelector('#max-data-age').value,
-    });
-    const response = await fetch(`/api/v1/opportunities/fusion?${parameters}`, { cache: 'no-store' });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error?.message ?? 'Could not analyse shard fusion.');
-    if (result.unavailable_reason) throw new Error('No fusion estimates: market snapshot is stale or incomplete.');
-    fusionCount.textContent = `${result.opportunities.length} found`;
-    if (result.truncated) {
-      fusionNotice.textContent = 'Showing the top 100 fusion recipes.';
-      fusionNotice.hidden = false;
-    }
-    const fragment = document.createDocumentFragment();
-    for (const item of result.opportunities) {
-      const row = document.createElement('tr');
-      const cells = [
-        (item.inputs ?? []).map((input) => `${displayName(input.product_id)} × ${number.format(input.quantity_total)} total (${number.format(input.quantity_per_fusion)}/fusion)`).join(' · '),
-        displayName(item.output_product_id),
-        `${number.format(item.operation_count)} / ${number.format(item.output_quantity)}`,
-        coin(item.acquisition_cost_coins), coin(item.gross_proceeds_coins),
-        coin(item.net_profit_coins), `${coin(item.estimated_profit_per_hour_coins)}/hr`,
-        `${(item.roi_basis_points / 100).toFixed(2)}%`,
-      ];
-      for (let index = 0; index < cells.length; index += 1) {
-        const cell = document.createElement('td');
-        cell.textContent = cells[index];
-        if (index === 5 || index === 6) cell.className = 'profit';
-        row.append(cell);
-      }
-      row.title = `${item.recipe_id} · manual execution · chance bonuses excluded`;
-      fragment.append(row);
-    }
-    if (!result.opportunities.length) {
-      const row = document.createElement('tr');
-      row.innerHTML = '<td colspan="8" class="empty">No guaranteed-output fusion edge currently meets your volume, depth, and budget limits.</td>';
-      fragment.append(row);
-    }
-    fusionRows.replaceChildren(fragment);
-  } catch (error) {
-    fusionCount.textContent = 'Unavailable';
-    fusionNotice.textContent = error.message;
-    fusionNotice.hidden = false;
-  } finally {
-    fusionRefresh.disabled = false;
-  }
-}
-
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   for (const id of settingsIds) localStorage.setItem(`huntlab.${id}`, document.getElementById(id).value);
   void load();
+  if (location.pathname.startsWith('/fusion')) void refreshFusionPage();
 });
 searchInput.addEventListener('input', renderFilteredOpportunities);
 sortInput.addEventListener('change', () => {
@@ -296,9 +237,36 @@ sortInput.addEventListener('change', () => {
   renderFilteredOpportunities();
 });
 refreshButton.addEventListener('click', () => void load());
-fusionRefresh.addEventListener('click', () => void loadFusion());
-document.querySelector('#fusion-nav').addEventListener('click', () => void loadFusion());
 restoreSettings();
 void loadItemNames();
 void load();
 setInterval(() => void load(), 30_000);
+let fusionInitialized = false;
+function navigate(path, push = true) {
+  const isFusion = path === '/fusion' || path === '/fusion/';
+  if (push && location.pathname !== (isFusion ? '/fusion' : '/')) history.pushState({}, '', isFusion ? '/fusion' : '/');
+  document.querySelector('#bazaar').hidden = isFusion;
+  document.querySelector('#fusion-page').hidden = !isFusion;
+  document.querySelector(isFusion ? '#fusion-settings-slot' : '#bazaar-settings-slot')
+    .append(document.querySelector('#shared-assumptions'));
+  document.querySelectorAll('[data-route]').forEach((link) => {
+    const active = link.dataset.route === (isFusion ? 'fusion' : 'bazaar');
+    link.classList.toggle('active', active);
+    if (active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+  document.title = isFusion ? 'HuntLab · Shard Fusion Explorer' : 'HuntLab · Bazaar Analysis';
+  if (isFusion && !fusionInitialized) {
+    fusionInitialized = true;
+    initFusionPage({ displayName, coin, number });
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a[data-route]');
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  navigate(link.dataset.route === 'fusion' ? '/fusion' : '/');
+});
+window.addEventListener('popstate', () => navigate(location.pathname, false));
+navigate(location.pathname, false);

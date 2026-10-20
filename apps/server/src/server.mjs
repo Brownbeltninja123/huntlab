@@ -94,6 +94,18 @@ export function createHuntlabServer({
   let lastError = null;
   let refreshInProgress = false;
   let fusionCatalogPromise;
+  function getFusionCatalog() {
+    fusionCatalogPromise ??= loadFusionCatalog().then((catalog) => {
+      const recipesByOutput = new Map();
+      for (const recipe of catalog.recipes) {
+        const recipes = recipesByOutput.get(recipe.output_product_id) ?? [];
+        recipes.push(recipe);
+        recipesByOutput.set(recipe.output_product_id, recipes);
+      }
+      return { ...catalog, recipesByOutput };
+    });
+    return fusionCatalogPromise;
+  }
   let activeAnalyses = 0;
   const analysisQueue = [];
   const maximumQueuedAnalyses = 4;
@@ -191,6 +203,52 @@ export function createHuntlabServer({
         } catch {
           return json(response, 503, { error: { code: 'item_catalog_unavailable', message: 'Hypixel item names are temporarily unavailable.', request_id: requestId } });
         }
+      }
+      if (pathname === '/api/v1/fusion/catalog') {
+        const catalog = await getFusionCatalog();
+        return json(response, 200, {
+          shards: catalog.shards,
+          shard_count: catalog.shardCount,
+          recipe_count: catalog.rawRecipeCount,
+          source: CATALOG_SOURCE,
+          validation_status: 'structural_catalog_validation_only',
+          validation_note: 'The pinned source structure and identifiers are checked. Game mechanics, unlocks, and special-case rules are not independently verified.',
+        });
+      }
+      const fusionShardMatch = pathname.match(/^\/api\/v1\/fusion\/catalog\/shards\/([A-Z0-9_:-]{1,128})$/);
+      if (fusionShardMatch) {
+        const catalog = await getFusionCatalog();
+        const shard = catalog.shards.find((item) => item.shard_id === fusionShardMatch[1]);
+        if (!shard) {
+          return json(response, 404, { error: { code: 'shard_not_found', message: 'Shard ID is not in the pinned fusion catalogue.', request_id: requestId } });
+        }
+        const allRecipes = catalog.recipesByOutput.get(shard.shard_id) ?? [];
+        let limit;
+        let offset;
+        const requestedRecipe = url.searchParams.get('recipe_id');
+        try {
+          limit = parseBoundedInteger(url.searchParams.get('limit') ?? '100', 'limit', 1, 100);
+          offset = parseBoundedInteger(url.searchParams.get('offset') ?? '0', 'offset', 0, 1_000_000);
+          if (requestedRecipe !== null) {
+            if (!/^[A-Z0-9_:-]{1,128}$/.test(requestedRecipe)) throw new Error('recipe_id is invalid');
+            const selectedIndex = allRecipes.findIndex((recipe) => recipe.recipe_id === requestedRecipe);
+            if (selectedIndex < 0) throw new Error('recipe_id is not a recipe for this shard');
+            offset = Math.floor(selectedIndex / limit) * limit;
+          }
+        } catch (error) {
+          return json(response, 400, { error: { code: 'invalid_catalog_query', message: error.message, request_id: requestId } });
+        }
+        const recipes = allRecipes.slice(offset, offset + limit);
+        return json(response, 200, {
+          shard,
+          recipes,
+          total_recipes: allRecipes.length,
+          offset,
+          limit,
+          source: CATALOG_SOURCE,
+          validation_status: 'structural_catalog_validation_only',
+          validation_note: 'Source recipe relationship; in-game requirements and special mechanics remain unverified.',
+        });
       }
       if (pathname === '/api/v1/status') {
         const dataAge = latest ? sourceDataAge(latest, now) : null;
@@ -323,7 +381,7 @@ export function createHuntlabServer({
           execution_model: 'immediate_order_book',
           fee_basis: 'configured_sale_fee_on_gross_proceeds',
           hourly_profit_formula: '(net_batch_profit / selected_quantity) * conservative_weekly_volume * participation_share / 168',
-          algorithm_version: 'bazaar-orderbook-v3-throughput-rate',
+          algorithm_version: 'bazaar-orderbook-v5-extreme-roi-filter',
           complete: !truncated,
           truncated,
           opportunities,
@@ -359,8 +417,7 @@ export function createHuntlabServer({
         let shardMarketById = new Map();
         if (!dataIsStale) {
           try {
-            fusionCatalogPromise ??= loadFusionCatalog();
-            const catalog = await fusionCatalogPromise;
+            const catalog = await getFusionCatalog();
             shardMarketById = new Map(latest.products.map((item) => [item.product_id, item]));
             // Bound the solver workload to recipes whose three traded items are in this snapshot.
             matchedRecipes = catalog.recipes.filter((recipe) => {
@@ -395,6 +452,15 @@ export function createHuntlabServer({
           const firstMarket = shardMarketById.get(opportunity.first_input_product_id);
           const secondMarket = shardMarketById.get(opportunity.second_input_product_id);
           const outputMarket = shardMarketById.get(opportunity.output_product_id);
+          const sameInput = opportunity.first_input_product_id === opportunity.second_input_product_id;
+          const inputDetail = (productId, quantityPerFusion, costMicros, market) => ({
+            product_id: productId,
+            quantity_per_fusion: quantityPerFusion,
+            quantity_total: quantityPerFusion * opportunity.operation_count,
+            acquisition_cost_coins: microsToCoins(costMicros),
+            visible_acquisition_depth: visibleDepth(market.sell_offers),
+            conservative_weekly_volume: market.conservative_weekly_volume,
+          });
           return ({
           recipe_id: opportunity.recipe_id,
           output_product_id: opportunity.output_product_id,
@@ -402,16 +468,17 @@ export function createHuntlabServer({
           second_input_product_id: opportunity.second_input_product_id,
           operation_count: opportunity.operation_count,
           output_quantity: opportunity.output_quantity,
-          inputs: recipe ? [
-            { product_id: recipe.first_input_product_id, quantity_per_fusion: recipe.first_input_quantity,
-              quantity_total: recipe.first_input_quantity * opportunity.operation_count,
-              visible_acquisition_depth: visibleDepth(firstMarket.sell_offers),
-              conservative_weekly_volume: firstMarket.conservative_weekly_volume },
-            { product_id: recipe.second_input_product_id, quantity_per_fusion: recipe.second_input_quantity,
-              quantity_total: recipe.second_input_quantity * opportunity.operation_count,
-              visible_acquisition_depth: visibleDepth(secondMarket.sell_offers),
-              conservative_weekly_volume: secondMarket.conservative_weekly_volume },
-          ] : [],
+          inputs: recipe ? (sameInput ? [inputDetail(
+            recipe.first_input_product_id,
+            recipe.first_input_quantity + recipe.second_input_quantity,
+            opportunity.first_input_cost_micros + opportunity.second_input_cost_micros,
+            firstMarket,
+          )] : [
+            inputDetail(recipe.first_input_product_id, recipe.first_input_quantity,
+              opportunity.first_input_cost_micros, firstMarket),
+            inputDetail(recipe.second_input_product_id, recipe.second_input_quantity,
+              opportunity.second_input_cost_micros, secondMarket),
+          ]) : [],
           visible_output_depth: visibleDepth(outputMarket?.buy_orders ?? []),
           conservative_weekly_output_volume: outputMarket?.conservative_weekly_volume ?? null,
           acquisition_cost_coins: microsToCoins(opportunity.acquisition_cost_micros),
@@ -452,7 +519,8 @@ export function createHuntlabServer({
         });
       }
 
-      const relativePath = pathname === '/' ? 'index.html' : pathname.slice(1);
+      const relativePath = pathname === '/' || pathname === '/fusion' || pathname === '/fusion/'
+        ? 'index.html' : pathname.slice(1);
       if (!/^[A-Za-z0-9._/-]+$/.test(relativePath) || relativePath.split('/').includes('..')) {
         return json(response, 404, { error: { code: 'not_found', message: 'Not found', request_id: requestId } });
       }

@@ -11,7 +11,9 @@ test('loads the pinned licensed catalog and validates deterministic recipe quant
 });
 
 test('rejects unknown shard references and invalid yields', () => {
-  const base = { shards: { A: { internal_id: 'SHARD_A', fuse_amount: 1 } }, recipes: {} };
+  const base = { shards: { A: { internal_id: 'SHARD_A', name: 'Alpha', fuse_amount: 1 } }, recipes: {} };
   assert.throws(() => parseFusionCatalog({ ...base, recipes: { A: { 1: [['A', 'MISSING']] } } }), /Invalid recipe edge/);
   assert.throws(() => parseFusionCatalog({ ...base, recipes: { A: { 3: [['A', 'A']] } } }), /Invalid output yield/);
+  assert.throws(() => parseFusionCatalog({ shards: { A: { ...base.shards.A }, B: { ...base.shards.A } }, recipes: {} }), /Invalid fusion shard/);
+  assert.throws(() => parseFusionCatalog({ shards: { A: { ...base.shards.A, name: '' } }, recipes: {} }), /Invalid fusion shard/);
 });

@@ -58,6 +58,19 @@ int main() {
         require(analysis::analyze_bazaar(constrained, {{10'001}, {1'000}, 1}).empty(),
                 "accepted invalid tax");
 
+        domain::MarketSnapshot saturated_roi;
+        saturated_roi.products.push_back(
+            {"SATURATED_ROI", {{{1}, 1, 1}}, {{{30'000'000}, 1, 1}}, 280'000});
+        require(analysis::analyze_bazaar(saturated_roi, {{0}, {100}, 1, 0}).empty(),
+                "returned an implausibly high ROI instead of filtering the candidate");
+
+        domain::MarketSnapshot crossed_book;
+        crossed_book.products.push_back({"ENCHANTED_REDSTONE_BLOCK",
+                                         {{{10'500'000}, 29'000, 2}, {{10'000'000'000}, 20, 1}},
+                                         {{{31'005'000'000}, 32, 1}}, 280'000});
+        require(analysis::analyze_bazaar(crossed_book, {{125}, {100'000'000}, 100, 0}).empty(),
+                "returned a crossed Bazaar book as a realistic flip");
+
         domain::MarketSnapshot varying_depth;
         varying_depth.products.push_back({"DEPTH_PRODUCT",
                                           {{{100}, 1, 1}, {{110}, 3, 1}},

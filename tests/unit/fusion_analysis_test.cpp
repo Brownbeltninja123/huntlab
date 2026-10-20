@@ -15,6 +15,8 @@ int main() {
         if (opportunities.size() != 1 || opportunities[0].operation_count != 5 ||
             opportunities[0].output_quantity != 10 ||
             opportunities[0].acquisition_cost.microcoins != 1'500 ||
+            opportunities[0].first_input_cost.microcoins != 500 ||
+            opportunities[0].second_input_cost.microcoins != 1'000 ||
             opportunities[0].gross_proceeds.microcoins != 5'000 ||
             opportunities[0].net_profit_microcoins != 3'500) {
             throw std::runtime_error(
@@ -30,7 +32,9 @@ int main() {
         const auto repeatedResult =
             huntlab::analysis::analyze_fusion(snapshot, {repeated}, settings);
         if (repeatedResult.size() != 1 || repeatedResult[0].operation_count != 1 ||
-            repeatedResult[0].acquisition_cost.microcoins != 300) {
+            repeatedResult[0].acquisition_cost.microcoins != 300 ||
+            repeatedResult[0].first_input_cost.microcoins != 300 ||
+            repeatedResult[0].second_input_cost.microcoins != 0) {
             throw std::runtime_error("same-shard recipe double-counted order-book depth or cost");
         }
         std::cout << "Fusion core checks passed.\n";

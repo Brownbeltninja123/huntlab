@@ -47,7 +47,7 @@ int main() {
         if (!std::getline(header, h[i], i + 1 == h.size() ? '\n' : '\t'))
             return 2;
     huntlab::analysis::BazaarSettings settings;
-    if (h[0] != "v1f" || !number(h[1], settings.sale_tax_basis_points) ||
+    if (h[0] != "v2f" || !number(h[1], settings.sale_tax_basis_points) ||
         !number(h[2], settings.available_capital.microcoins) ||
         !number(h[3], settings.maximum_quantity) || !number(h[4], settings.minimum_weekly_volume) ||
         !number(h[5], settings.sale_horizon_hours) ||
@@ -103,6 +103,8 @@ int main() {
                   << opportunity.second_input_product_id << '\t' << opportunity.operation_count
                   << '\t' << opportunity.output_quantity << '\t'
                   << opportunity.acquisition_cost.microcoins << '\t'
+                  << opportunity.first_input_cost.microcoins << '\t'
+                  << opportunity.second_input_cost.microcoins << '\t'
                   << opportunity.gross_proceeds.microcoins << '\t'
                   << opportunity.sale_fee.microcoins << '\t' << opportunity.net_profit_microcoins
                   << '\t' << opportunity.roi_basis_points << '\t'

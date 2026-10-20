@@ -38,16 +38,28 @@ Updated: 2026-10-20
 - [ ] Add live market-history checks and calibrate fill-speed/confidence before presenting a probabilistic score.
 - [x] Build the shard fusion slice with a pinned, hash-verified catalog, quantity-aware C++ optimizer, API endpoint, and manual-estimate UI.
 
+## Phase 4 — shard fusion explorer UX
+
+- [x] Add a dedicated `/fusion` route with direct-load/refresh support, history navigation, and shared trade assumptions.
+- [x] Add searchable/filterable shard discovery, separately ranked opportunities, minimum profit/ROI filters, and direct route opening.
+- [x] Add a bounded, progressively loaded directed SVG graph with alternative branches, shared-input nodes, pan/zoom/fit/reset, keyboard-selectable nodes, and cycle-safe breadcrumbs.
+- [x] Add paged catalogue API routes and source/validation disclosure without loading all recipe edges into the browser.
+- [x] Return quantity-aware per-ingredient acquisition costs from C++ and display the full returned batch breakdown, liquidity, fees, ROI, freshness, and source metadata.
+- [x] Preserve the Bazaar view and move the single shared trade-assumption panel between the two routes.
+- [x] Update API schema, feature documentation, and CI coverage.
+
 ## Build and test record
 
 - `cmake --preset default --fresh` — passed with CMake 4.4.4, Ninja, and MinGW GCC 16.2.0.
 - `cmake --build --preset default --parallel` — passed.
 - `ctest --preset default --output-on-failure` — passed, 2/2 C++ test executables (Bazaar and fusion core).
-- Full Node API/integration suite after current updates — passed, 25/25, including catalog integrity, full fusion graph protocol, C++ fusion CLI, Bazaar, SQLite, and API routes. HTTP tests require local loopback access.
+- Full Node API/integration suite after fusion UI and cost-breakdown changes — passed, 31/31, including catalog integrity, fusion graph helpers, C++ fusion CLI protocol, Bazaar, SQLite, API and direct `/fusion` route. HTTP tests require local loopback access.
 - CMake rebuild and `ctest --preset default` after fusion — passed, 2/2 C++ test executables.
 - Node parser, persistence, server, Bazaar integration, and fusion engine tests — passed, 25/25 (21 non-HTTP and 4 loopback HTTP tests).
 - Node syntax checks for the changed server, protocol and browser modules — passed.
 - `git diff --check` — passed (Git reported a harmless LF-to-CRLF working-copy warning for `README.md`).
+- OpenAPI YAML parse, HTML duplicate-ID/label-target scan, and `clang-format --dry-run --Werror` for changed C++ files — passed.
+- A real-browser visual pass could not be completed because the available computer-use runtime failed to initialize (`failed to write kernel assets`, OS error 3). Automated server, route, logic, and markup checks passed.
 - `clang-format --dry-run --Werror core/src/*.cpp core/include/huntlab/domain/*.hpp core/include/huntlab/analysis/*.hpp tests/unit/*.cpp` and Node syntax checks — passed.
 - `git diff --check` — passed (Git reported a harmless LF-to-CRLF working-copy warning for `README.md`).
 
@@ -55,6 +67,6 @@ Updated: 2026-10-20
 
 The slice analyzes Bazaar instant buy from seller offers followed by instant sell into buyer orders. Batch sizing now uses the smaller weekly volume counter, a user-set time window and share, plus current depth and capital. The new coins/hour estimate is a volume extrapolation from a single current book snapshot, not a measured rate. Risk labels are heuristics, not proof of manipulation. HuntLab still does not model limit-order queue position, measured fill rates, market impact beyond returned top-30 summary levels, or realized profit. Hypixel data can change before a user acts. Opportunity results are estimates and the UI directs users to execute manually.
 
-Auction House valuation/flips, crafting recipes, historical time-series charts, unified cross-market ranking, Discord notifications, broader profile statistics, profile selection, authentication for non-local deployments, and richer pagination remain unimplemented. Item names/materials/tiers use Hypixel's official resource; actual item icons still need a legally reviewed texture-mapping source. No third-party code was imported; the MIT fusion dataset is documented separately in `docs/PROVENANCE.md`.
+The fusion page is a progressive direct-recipe explorer, not a recursive target-route optimizer. The current C++ opportunity API returns positive eligible results only, so a missing result cannot be classified as a loss and does not provide exclusion-specific reasons. The pinned catalog has only structural validation; game requirements/unlocks/special mechanics need independent current verification. Profit/hour is a throughput extrapolation. Auction House analysis, crafting recipes, historical charts, unified cross-market ranking, Discord notifications, and broader profile statistics remain unimplemented. Item names/materials/tiers use Hypixel's official resource; actual item icons still need a legally reviewed texture-mapping source. No third-party code was imported; the MIT fusion dataset is documented separately in `docs/PROVENANCE.md`.
 
 The application requires Node.js with `node:sqlite` support and a built C++ CLI. Local build/test commands and environment variables are documented in `docs/DEVELOPMENT.md`. The live feed is dynamic, so live opportunity counts and prices are not acceptance-test expectations.

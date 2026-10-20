@@ -216,6 +216,8 @@ std::vector<FusionOpportunity> analyze_fusion(const domain::MarketSnapshot& snap
                     operations,
                     operations * recipe.output_quantity,
                     {cost},
+                    {first_cost},
+                    {second_cost},
                     {proceeds},
                     {fee},
                     net,
